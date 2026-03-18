@@ -8,14 +8,14 @@
 优先使用深度链接导航，可跳过多层弹窗和 WebView 页面。
 
 ```bash
-# 通用调用方式
-adb-claw open 'imeituan://www.meituan.com/search?query=火锅'
+# 通用调用方式（参数名为 q，非 query）
+adb-claw open 'imeituan://www.meituan.com/search?q=火锅'
 ```
 
 | 动作 | 链接 | 参数说明 |
 |------|------|----------|
-| 搜索 | `imeituan://www.meituan.com/search?query={keyword}` | 打开搜索页（不自动执行搜索，需手动点击搜索按钮或回车） |
-| 外卖首页 | `imeituan://www.meituan.com/waimai` | 进入外卖频道 |
+| 搜索 | `imeituan://www.meituan.com/search?q={keyword}` | 直接打开搜索结果页（参数名为 `q`，非 `query`；支持中文关键词） |
+| 外卖首页 | `imeituan://www.meituan.com/waimai` | 进入外卖频道（TakeoutActivity） |
 | 商家详情 | `imeituan://www.meituan.com/shop/{shop_id}` | shop_id 为数字 |
 | 扫一扫 | `imeituan://www.meituan.com/scan` | |
 
@@ -25,9 +25,12 @@ adb-claw open 'imeituan://www.meituan.com/search?query=火锅'
 
 | Activity | 说明 |
 |----------|------|
-| `com.meituan.android.pt.homepage.activity.MainActivity` | 主首页 + 外卖首页 |
-| `com.sankuai.waimai.business.restaurant.poicontainer.WMRestaurantActivity` | 外卖餐厅详情/菜单 |
-| `com.sankuai.waimai.platform.machpro.container.WMMPActivity` | 外卖下单/结算 |
+| `com.meituan.android.pt.homepage.activity.MainActivity` | 美团主首页（综合入口） |
+| `com.sankuai.waimai.business.page.homepage.TakeoutActivity` | **外卖频道首页**（UI tree 失败） |
+| `com.sankuai.waimai.business.restaurant.poicontainer.WMRestaurantActivity` | 外卖餐厅详情/菜单（UI tree 失败） |
+| `com.sankuai.waimai.platform.machpro.container.WMMPActivity` | 商品详情/加购/购物车（UI tree 失败） |
+| `com.sankuai.meituan.search.result.SearchResultActivity` | 搜索结果页 |
+| `com.dianping.gcmrn.ssr.GCMRNSSRActivity` | 分类浏览页（React Native SSR） |
 | `com.sankuai.titans.adapter.mtapp.KNBWebViewActivity` | 通用 WebView 页面 |
 | `com.meituan.android.lightbox.activity.LightBoxActivity` | 营销弹窗 |
 
@@ -100,6 +103,11 @@ adb-claw open 'imeituan://www.meituan.com/search?query=火锅'
 
 进入方式：`adb-claw open 'imeituan://www.meituan.com/waimai'` 或首页点"外卖"宫格。
 
+**实测坐标（1080×2340，Xiaomi）**：
+- 分类图标区在 y≈430-650，可 `tap --text 外卖` 从主页定位
+- **餐厅卡片**：首页加载时分类图标占上半屏，需先 `scroll down` 一页，再 tap x=540, y≈400-600（取决于列表位置）
+- 底部外卖导航：y≈2093，各 Tab 从左到右 x≈75/270/465/660/855
+
 ### 餐厅菜单页（WMRestaurantActivity）
 
 ```
@@ -124,12 +132,15 @@ adb-claw open 'imeituan://www.meituan.com/search?query=火锅'
 ```
 
 **菜单页说明**：
-- 左侧为分类导航（猜你喜欢/神抢手/本店招牌/大口吃肉/鲜串荤菜 等）
-- 右侧为菜品列表，每个菜品有图片、名称、月售量、价格、"+"加购按钮
-- 点击菜品进入详情页，有"加入购物车"按钮（原生元素，可 UI tree 定位）
+- 左侧为分类导航（必点招牌/收藏福利/超值双拼/多人套餐 等），右侧为菜品列表
+- 分类名称可通过 `monitor` 获取（格式如 `🐷｜必点👍｜招牌`）
 - 底部购物车栏显示总价、起送差额、满减提示
 - 有"必选品"时（如打包费），按钮显示"未点必选品"，需先选择才能结算
 - "外送"/"自取"可在顶部切换
+
+**实测坐标（1080×2340）**：
+- 菜品右侧 `+` 按钮：x≈960，y 随菜品在屏幕上的位置而定
+- 点击菜品图片/名称区域（x≈400-800）进入商品详情页（WMMPActivity）
 
 ### 搜索结果页
 
@@ -144,6 +155,29 @@ adb-claw open 'imeituan://www.meituan.com/search?query=火锅'
 │ [店铺卡片] ...                                     │
 └──────────────────────────────────────────────────┘
 ```
+
+### 商品详情页（WMMPActivity）
+
+```
+┌──────────────────────────────────────────────────┐
+│  [商品大图（全宽）]                               │
+├──────────────────────────────────────────────────┤
+│  ¥原价  新客价¥折扣价           [加入购物车]     │  ← 红色价格条（y≈900-1100）
+├──────────────────────────────────────────────────┤
+│  {商品名} 新客专享               精单 月售N      │
+│  [回头客推荐] [味道赞] [分量足] 等标签            │
+│  推荐指数 / 口感描述 / 制作方法                   │
+├──────────────────────────────────────────────────┤
+│  商品评价{N}                       查看全部>     │
+│  [买家评论列表]                                   │
+└──────────────────────────────────────────────────┘
+│  [- N +]              ¥总价  减¥X  [去结算]     │  ← 底部栏（加购后出现）
+```
+
+**实测坐标（1080×2340，Xiaomi）**：
+- **"加入购物车"按钮**：位于红色价格条右侧，x≈960, **y≈1150-1200**（实测有效范围）
+- 每点击一次数量 +1，多次点击会累加（注意控制）
+- "去结算"按钮：x≈950, y≈2100（底部栏右侧）
 
 ## 设备差异
 
@@ -171,10 +205,12 @@ adb-claw wait --activity "com.meituan.android.pt.homepage.activity.MainActivity"
 
 ```bash
 # 方式 1: 深度链接（推荐，绕过中文输入限制）
-adb-claw open 'imeituan://www.meituan.com/search?query=火锅'
+adb-claw open 'imeituan://www.meituan.com/search?q=火锅'
 
-# 方式 2: 手动搜索（仅限 ASCII 关键词）
-adb-claw tap --text "搜索"
+# 方式 2: 手动搜索（仅限 ASCII 关键词；中文用深度链接）
+# 注意：外卖页 UI tree 失败，搜索栏坐标估算 x=540, y≈220
+adb-claw tap 540 220
+adb-claw clear-field
 adb-claw type "coffee"
 adb-claw key ENTER
 ```
@@ -182,19 +218,18 @@ adb-claw key ENTER
 ### 查找外卖餐厅
 
 ```bash
-# 方式 1: 进入外卖频道浏览（推荐）
-adb-claw open 'imeituan://www.meituan.com/waimai'
-# 外卖首页按距离/评分自动推荐附近餐厅，向下滚动浏览
-adb-claw scroll down          # 查看更多餐厅
-adb-claw scroll down --pages 3  # 连续滚动
+# 方式 1: 搜索特定餐厅（推荐，支持中文）
+adb-claw open 'imeituan://www.meituan.com/search?q=肯德基'
+# → 进入 SearchResultActivity，monitor 可读取餐厅列表
+# → 截屏确认餐厅位置，scroll down 后 tap x=540, y≈400-600 进入餐厅
 
-# 方式 2: 搜索特定餐厅/菜品（ASCII 关键词）
-# 在外卖首页点击搜索栏
-adb-claw tap --text "搜索"
-adb-claw clear-field           # 清空已有文字
-adb-claw type "coffee"
-adb-claw key ENTER
-# 搜索结果页有 Tab：全部/外卖/团购/地点/笔记
+# 方式 2: 进入外卖频道浏览附近餐厅
+adb-claw open 'imeituan://www.meituan.com/waimai'
+# 外卖首页分类图标下方是餐厅列表，需先滚动
+adb-claw scroll down           # 滚一页后餐厅卡片进入视野
+adb-claw screenshot            # 截屏确认当前视野
+adb-claw monitor --duration 2000  # 读取餐厅名字确认内容
+adb-claw tap 540 500           # 点击餐厅卡片（y≈400-600 视情况）
 
 # 方式 3: 按分类浏览
 # 外卖首页的分类宫格（甜品饮品/小吃/汉堡披萨/火锅 等）
@@ -213,14 +248,17 @@ adb-claw key ENTER
 #    向下滚动查看更多菜品
 adb-claw scroll down
 
-# 3. 加购菜品（两种方式）
-#    方式 A: 点击菜品进入详情页 → 点"加入购物车"（原生按钮）
-adb-claw tap {菜品区域坐标}      # 进入菜品详情
-adb-claw tap --text "加入购物车"  # UI tree 可定位
-adb-claw key BACK                # 返回菜单继续选
+# 3. 加购菜品
+# UI tree 在商家页失败，只能通过坐标点击
+# 方式 A: 点击菜品进入商品详情页（WMMPActivity）
+adb-claw tap 540 {菜品中心y}      # 点菜品图片/名称区域
+adb-claw screenshot               # 确认进入商品详情
+# 在详情页点击"加入购物车"（价格条右侧）
+adb-claw tap 960 1175             # x≈960, y≈1150-1200（实测值）
+adb-claw key BACK                 # 返回菜单继续选
 
-#    方式 B: 直接点菜品右侧的"+"按钮（WebView 中，需坐标）
-adb-claw tap {加号按钮坐标}
+# 方式 B: 直接点菜品右侧的"+"按钮
+adb-claw tap 960 {菜品右侧y}      # x≈960，y 对准 + 按钮
 
 # 4. 检查购物车
 #    底部栏显示：总价 + 配送费 + 起送差额
@@ -268,16 +306,15 @@ adb-claw key BACK
 
 ### 大量页面为 WebView，UI tree 返回 0 元素
 
-**现象**: `adb-claw ui tree` 在首页、外卖频道、餐厅菜单等页面仅能获取少量原生元素（搜索栏、底部 Tab），核心内容区返回 0 元素。
+**现象**: `adb-claw ui tree` 在**外卖所有页面**（TakeoutActivity、WMRestaurantActivity、WMMPActivity）全部返回 `UI_DUMP_FAILED`（0 元素）。仅美团主首页（MainActivity）的原生元素可正常获取。
 
-**原因**: 美团广泛使用 WebView 渲染内容（`KNBWebViewActivity` + 内嵌 WebView），uiautomator 无法穿透 WebView。
+**原因**: 美团外卖广泛使用 React Native + WebView 混合架构，uiautomator dump 无法穿透 RN/WebView 层。
 
 **解决**:
-1. 导航操作依赖截屏 + 坐标点击
-2. 优先使用深度链接跳转到目标页面，减少 UI 操作
-3. 底部 Tab、搜索栏等原生控件可正常通过 UI tree 定位
-4. 菜品详情页的"加入购物车"按钮是原生元素，可用 `tap --text "加入购物车"` 定位
-5. 餐厅菜单列表中的菜品和"+"按钮是 WebView，只能用坐标点击
+1. 用 `monitor` 获取页面文字（accessibility 框架，所有页面均可用）
+2. 优先使用深度链接跳转，减少坐标点击操作
+3. 导航和交互依赖截屏 + 估算坐标点击
+4. **切勿使用 `tap --text` 或 `tap --id`**（UI tree 失败时这些命令也无效）
 
 ### 频繁操作触发验证码
 
@@ -327,7 +364,7 @@ adb-claw key BACK
 
 **原因**: `adb shell input text` 不支持非 ASCII 字符。
 
-**解决**: 使用深度链接搜索（`imeituan://www.meituan.com/search?query=火锅`），天然支持中文参数。
+**解决**: 使用深度链接搜索（`imeituan://www.meituan.com/search?q=火锅`），天然支持中文参数（参数名为 `q`）。
 
 ---
 
